@@ -1,0 +1,45 @@
+name: Build OpenWrt 19.07 for RB941-2nD
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout OpenWrt source
+        uses: actions/checkout@v3
+        with:
+          ref: openwrt-19.07
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential git libncurses5-dev gawk \
+            unzip file libssl-dev wget python3 rsync python2
+          sudo update-alternatives --install /usr/bin/python python /usr/bin/python2 1
+
+      - name: Update feeds
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Configure target
+        run: |
+          rm -f .config
+          make defconfig
+          echo "CONFIG_TARGET_ar71xx=y" >> .config
+          echo "CONFIG_TARGET_ar71xx_mikrotik=y" >> .config
+          echo "CONFIG_TARGET_ar71xx_mikrotik_DEVICE_rb-nor-flash-16M=y" >> .config
+          echo "CONFIG_TARGET_IMAGES_RAMDISK=y" >> .config
+          make defconfig
+
+      - name: Build OpenWrt
+        run: make -j$(nproc)
+
+      - name: Upload initramfs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-rb941-initramfs
+          path: bin/targets/ar71xx/mikrotik/*initramfs*
